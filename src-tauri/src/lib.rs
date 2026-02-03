@@ -14,6 +14,10 @@ fn add_pending_files(paths: Vec<String>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let args: Vec<String> = std::env::args_os()
+                            .map(|oss| oss.to_string_lossy().into_owned())
+                            .collect();
+    add_pending_files(args[1..].to_vec());
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
@@ -39,7 +43,7 @@ pub fn run() {
     .run(|app, event| {
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         if let tauri::RunEvent::Opened { urls } = event {
-            let files = urls
+          let files = urls
             .into_iter()
             .filter_map(|u| u.to_file_path().ok())
             .map(|url| url.as_os_str().to_string_lossy().into_owned())
@@ -48,5 +52,5 @@ pub fn run() {
             add_pending_files(files);
             let _ = app.emit("open-file", ());
         }
-    });
+    })
 }
