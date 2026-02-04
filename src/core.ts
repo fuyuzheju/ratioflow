@@ -39,30 +39,30 @@ export const calculateTree = (
         const allocated = child.rule.value;
         remainingAmount -= allocated;
         calculateTree(child, allocated, resultMap);
-        resultMap[child.id].percentOfParent = inputAmount === 0 ? 0 : (allocated / inputAmount);
+        resultMap[child.id]!.percentOfParent = inputAmount === 0 ? 0 : (allocated / inputAmount);
     });
 
     percentNodes.forEach(child => {
         const allocated = inputAmount * (child.rule.value / 100);
         remainingAmount -= allocated;
         calculateTree(child, allocated, resultMap);
-        resultMap[child.id].percentOfParent = child.rule.value / 100;
+        resultMap[child.id]!.percentOfParent = child.rule.value / 100;
     });
 
     if (remainderNodes.length > 0) {
         const amountPerNode = remainingAmount / remainderNodes.length;
         remainderNodes.forEach(child => {
             calculateTree(child, amountPerNode, resultMap);
-            resultMap[child.id].percentOfParent = inputAmount === 0 ? 0 : (amountPerNode / inputAmount);
+            resultMap[child.id]!.percentOfParent = inputAmount === 0 ? 0 : (amountPerNode / inputAmount);
         });
-        resultMap[node.id].unallocated = 0;
+        resultMap[node.id]!.unallocated = 0;
     } else {
-        resultMap[node.id].unallocated = remainingAmount;
+        resultMap[node.id]!.unallocated = remainingAmount;
     }
 
-    resultMap[node.id].isError = inputAmount < -0.01 || resultMap[node.id].unallocated < -0.01;
-    resultMap[node.id].isWarning = (!resultMap[node.id].isError) &&
-        (resultMap[node.id].unallocated > 0.01) &&
+    resultMap[node.id]!.isError = inputAmount < -0.01 || resultMap[node.id]!.unallocated < -0.01;
+    resultMap[node.id]!.isWarning = (!resultMap[node.id]!.isError) &&
+        (resultMap[node.id]!.unallocated > 0.01) &&
         (node.children.length > 0);
 
     return resultMap;

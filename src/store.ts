@@ -57,7 +57,7 @@ const findParent = (root: AllocNode, targetId: string): AllocNode | null => {
     return null;
 };
 
-const createDefaultProject = (id: string, layout: NodeLayoutType, name: string): ProjectData => {
+const createDefaultProject = (id: string, layout: NodeLayoutType, name: string) => {
     return {
         id: id,
         name: name,
@@ -108,9 +108,10 @@ const cloneNodeNewIds = (node: AllocNode): {node: AllocNode, ids: Record<string,
 const clonePhaseNewIds = (phase: PhaseData): PhaseData => {
     const {ids, node} = cloneNodeNewIds(phase.rootNode);
     const newLayouts: Record<string, NodeLayoutType> = {};
-    Object.keys(ids).forEach(oldId => {
-        const newId = ids[oldId];
-        newLayouts[newId] = phase.view.nodeLayouts[oldId];
+    Object.entries(ids).forEach(([oldId, newId]) => {
+        const layout = phase.view.nodeLayouts[oldId];
+        if (layout === undefined) throw new Error;
+        newLayouts[newId] = layout;
     })
     return {
         ...phase,
@@ -152,7 +153,7 @@ const useBaseStore = create<BaseState>((set) => {
     return {
         projects: [initialProject],
         activeProjectId: initialId,
-        activePhaseId: initialProject.phases[0].id,
+        activePhaseId: initialProject.phases[0]!.id,
         selectedNodeId: null,
         clipboard: null,
         projectsSaved: {[initialId]: false},
@@ -164,7 +165,7 @@ const useBaseStore = create<BaseState>((set) => {
                 return {
                     projects: [...state.projects, newProject],
                     activeProjectId: newId,
-                    activePhaseId: newProject.phases[0].id,
+                    activePhaseId: newProject.phases[0]!.id,
                     projectsSaved: {...state.projectsSaved, [newId]: false},
                 };
             });
@@ -175,7 +176,7 @@ const useBaseStore = create<BaseState>((set) => {
                 const activeProject = state.projects.find(p => p.id === id)!;
                 return {
                     activeProjectId: id,
-                    activePhaseId: activeProject.phases[0].id,
+                    activePhaseId: activeProject.phases[0]!.id,
                 }
             })
         },
@@ -184,9 +185,9 @@ const useBaseStore = create<BaseState>((set) => {
             set(state => {
                 if (state.projects.length <= 1) return state;
                 const newProjects = state.projects.filter(p => p.id !== id);
-                const newActiveProjectId = state.activeProjectId === id ? newProjects[0].id : state.activeProjectId;
+                const newActiveProjectId = state.activeProjectId === id ? newProjects[0]!.id : state.activeProjectId;
                 const newActiveProject = state.projects.find(pj => pj.id === newActiveProjectId)!;
-                const newActivePhaseId = state.activeProjectId === id ? newActiveProject.phases[0].id : state.activePhaseId;
+                const newActivePhaseId = state.activeProjectId === id ? newActiveProject.phases[0]!.id : state.activePhaseId;
                 return {
                     projects: newProjects,
                     activeProjectId: newActiveProjectId,
@@ -197,16 +198,21 @@ const useBaseStore = create<BaseState>((set) => {
 
         loadProject: (data) => {
             set(state => {
+                let ph = data.phases[0];
+                if (ph === undefined) {
+                    ph = createDefaultPhase(crypto.randomUUID(), 'vertical', '入账');
+                    data.phases = [ph];
+                }
                 if (state.projects.find(p => p.id === data.id)) {
                     return {
                         activeProjectId: data.id,
-                        activePhaseId: data.phases[0].id,
+                        activePhaseId: ph.id,
                     }
                 }
                 return {
                     projects: [...state.projects, data],
                     activeProjectId: data.id,
-                    activePhaseId: data.phases[0].id,
+                    activePhaseId: ph.id,
                     projectsSaved: {...state.projectsSaved, [data.id]: true},
                 }
             });
@@ -261,7 +267,7 @@ const useBaseStore = create<BaseState>((set) => {
                     projects: state.projects.map(pj => pj.id !== state.activeProjectId ? pj :
                         {...pj, phases: newPhases}
                     ),
-                    activePhaseId: state.activePhaseId === id ? newPhases[0].id : state.activePhaseId,
+                    activePhaseId: state.activePhaseId === id ? newPhases[0]!.id : state.activePhaseId,
                     projectsSaved: {...state.projectsSaved, [state.activeProjectId]: false},
                 }
             }})
@@ -489,20 +495,14 @@ const useBaseStore = create<BaseState>((set) => {
 
         toggleNodeLayout: (id) => {
             set(state => {
-                let newLayout: NodeLayoutType;
                 const activeProject = state.projects.find(pj => pj.id === state.activeProjectId)!;
                 const activePhase = activeProject.phases.find(ph => ph.id === state.activePhaseId)!;
-                switch (activePhase.view.nodeLayouts[id]) {
-                    case 'collapsed':
-                        newLayout = 'vertical';
-                        break;
-                    case 'vertical':
-                        newLayout = 'horizontal';
-                        break;
-                    case 'horizontal':
-                        newLayout = 'collapsed';
-                        break;
+                const layoutMap: Record<NodeLayoutType, NodeLayoutType> = {
+                    collapsed: 'vertical',
+                    vertical: 'horizontal',
+                    horizontal: 'collapsed',
                 }
+                const newLayout: NodeLayoutType = layoutMap[activePhase.view.nodeLayouts[id]??'vertical'];
                 const newNodeLayouts = {...activePhase.view.nodeLayouts, [id]: newLayout};
                 return {
                     projects: state.projects.map(pj => pj.id !== state.activeProjectId ? pj :
@@ -532,7 +532,7 @@ const useBaseStore = create<BaseState>((set) => {
                 const nodeStack = [nodeToCopy];
                 while (nodeStack.length > 0) {
                     const currentNode = nodeStack.pop()!;
-                    copiedLayouts[currentNode.id] = activePhase.view.nodeLayouts[currentNode.id];
+                    copiedLayouts[currentNode.id] = activePhase.view.nodeLayouts[currentNode.id]??'vertical';
                     for (const child of currentNode.children) {
                         nodeStack.push(child);
                     }
@@ -547,18 +547,18 @@ const useBaseStore = create<BaseState>((set) => {
         pasteNode: () => {
             set(state => {
                 if (state.selectedNodeId === null) return state;
-                if (state.clipboard === null) return state;
+                const clipboard = state.clipboard;
+                if (clipboard === null) return state;
                 const activeProject = state.projects.find(pj => pj.id === state.activeProjectId)!;
                 const activePhase = activeProject.phases.find(ph => ph.id === state.activePhaseId)!;
 
-                const {node: cb, ids} = cloneNodeNewIds(state.clipboard.node);
+                const {node: cb, ids} = cloneNodeNewIds(clipboard.node);
                 const newRoot = updateTree(activePhase.rootNode, state.selectedNodeId, n => {
                     n.children = [...n.children, cb];
                 });
                 const newLayouts: Record<string, NodeLayoutType> = activePhase.view.nodeLayouts;
-                Object.keys(ids).forEach(oldId => {
-                    const newId = ids[oldId];
-                    newLayouts[newId] = state.clipboard!.view.nodeLayouts[oldId];
+                Object.entries(ids).forEach(([oldId, newId]) => {
+                    newLayouts[newId] = clipboard.view.nodeLayouts[oldId]??'vertical';
                 })
 
                 return {
