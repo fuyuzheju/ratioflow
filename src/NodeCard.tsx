@@ -470,6 +470,7 @@ const NodeCard: React.FC<{
                 <div className={`node-card-content 
                             ${!hasChildren ? 'leaf' : ''} 
                             ${result.isError ? 'has-error' : ''} 
+                            ${result.isWarning ? 'has-warning' : ''}
                             ${dragClass}`}
                     draggable={true}
                     onDragStart={(e) => handleDragStart(e, false, node, setIsDragging)}

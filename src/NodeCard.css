@@ -113,6 +113,11 @@
     background: var(--danger-light);
 }
 
+.node-card-content.has-warning {
+    border-color: var(--warning);
+    background: var(--warning-light);
+}
+
 .node-card-content.drag-inside {
     background-color: #eff6ff;
     border: 2px dashed #2563eb;
